@@ -164,6 +164,7 @@ int main(int argc, char **argv)
   }
 
   // win32 Sleep(0xdac);
+  // ch549 need enough time to enter IAP mode.
   usleep(3500*1000);
 
   // STEP 4: open IAP device 
