@@ -31,6 +31,12 @@ Plug WCH-Link to PC USB port and run:
 
 I put the WCH-Link(CH549) and WCH-LinkE(CH32V) firmwares in this repo, for WCH-LinkS/WCH-LinkB, you can download and extract firmware from WCH-LinkUtility.
 
+# Info:
+
+[ghidra](https://github.com/NationalSecurityAgency/ghidra): to analyse binaries of WCH-LinkUtility.
+
+[usbpcap](https://github.com/desowin/usbpcap): to sniff USB data under windows.
+
 # TODO:
 
 Contact [wlink](https://github.com/ch32-rs/wlink) to implement this feature ASAP
