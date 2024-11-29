@@ -18,15 +18,6 @@ out: 0x81020000
 in: 0x0000
 
 # start write:
-# 80 3c 00 00
-# 80 is ?
-# 0x3c is length, = 60
-# 0000 is offset:
-# first packet is 0
-# second packet should be 0x3c00
-# third packet should be 0x3c00 + 0x3c = 0x7800
-# and its pattern is: 0x3c00 + size <<2  
-
 out: 803c0000 
 6f10c01a130000001300
 00001300000013000000
