@@ -9,8 +9,7 @@ Tested with:
 - WCH-Link
 - WCH-LinkE r0 1v2
 - WCH-LinkE r0 1v3
-
-And various thirdparty Link/LinkE.
+- Various thirdparty Link/LinkE.
 
 # Installation:
 
@@ -34,4 +33,4 @@ I put the WCH-Link(CH549) and WCH-LinkE(CH32V) firmwares in this repo, for WCH-L
 
 # TODO:
 
-Contact [wlink](https://github.com/ch32-rs/wlink) to implement this feature ASAP :-)
+Contact [wlink](https://github.com/ch32-rs/wlink) to implement this feature ASAP
