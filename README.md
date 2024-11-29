@@ -4,6 +4,14 @@ Just like WCH-LinkUtility, this is the tool to upgrade or downgrade WCH-LinkE fi
 
 With this tool, you don't need to enter ISP mode or buy another WCH-LinkE to upgrade / downgrade the firmware of WCH-LinkE.
 
+Tested with:
+
+- WCH-Link
+- WCH-LinkE r0 1v2
+- WCH-LinkE r0 1v3
+
+And various thirdparty Link/LinkE.
+
 # Installation:
 
 ```
