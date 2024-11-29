@@ -234,6 +234,7 @@ int main(int argc, char **argv)
     memset(small_buf, 0, 64);
 
     //first time write.
+    //note the 0*2
     small_buf[0] = 0*2 + 0x80;
     small_buf[1] = copy_size;
     small_buf[2] = offset;
