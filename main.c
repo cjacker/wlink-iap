@@ -75,7 +75,7 @@ int main(int argc, char **argv)
     goto end;
   }
 
-  // step 1: Read adatper type and firmware version
+  // STEP 1: Read adatper type and firmware version
   txbuf[0] = 0x81;
   txbuf[1] = 0x0d;
   txbuf[2] = 0x01;
@@ -86,7 +86,10 @@ int main(int argc, char **argv)
   pReadData(wlink_handle, 1, rxbuf, &len);
   printf("Adapter type:%x, version: v%d.%d\n", rxbuf[5], rxbuf[3], rxbuf[4]);
 
-  // should force validate the firmware file name.
+  // according to adapter type, find wchlinke chiptype and correct firmware
+  // and compare version info with "wchlink.wcfg"
+  // for adapter type 0x02 and 0x12, it's WCH-LinkE: FIRMWARE_CH32V203.BIN
+  
   switch (rxbuf[5]) {
     case 1: 
       printf("Found WCH-Link(ch549)\n");
@@ -112,13 +115,8 @@ int main(int argc, char **argv)
   printf("DO NOT UNPLUG WCH-Link/E until done!!!\n");
   printf("###########################\n");
 
-  // according to adapter type, find wchlinke chiptype and correct firmware
-  // and compare version info with "wchlink.wcfg"
-  // for adapter type 0x02 and 0x12, it's WCH-LinkE: FIRMWARE_CH32V203.BIN  
   
-  // if outdated:
-  // step 2: load firmware to buffer 
-  //0x80000 is from McuCompilerDLL.dll
+  // STEP 2: load firmware to buffer 
 
   /* declare a file pointer */
   FILE    *infile;
@@ -152,7 +150,7 @@ int main(int argc, char **argv)
   fread(buffer, sizeof(char), filesize, infile);
   fclose(infile);
 
-  // step3: switch to IAP mode: 0x01010f81 len 4
+  // STEP 3: switch to IAP mode: 0x01010f81 len 4
   txbuf[0] = 0x81;
   txbuf[1] = 0x0f;
   txbuf[2] = 0x01;
@@ -168,6 +166,7 @@ int main(int argc, char **argv)
   // win32 Sleep(0xdac);
   usleep(3500*1000);
 
+  // STEP 4: open IAP device 
   if (jtag_libusb_open(iap_vids, iap_pids, &iap_handle) != ERROR_OK)
   {
     fprintf(stderr, "Open iap device failed\n");
@@ -188,8 +187,7 @@ int main(int argc, char **argv)
     goto end;
   }
 
-
-  // before program
+  // STEP 5: before flash the firmware.
   txbuf[0] = 0x81;
   txbuf[1] = 0x02;
   txbuf[2] = 0x00;
@@ -213,12 +211,9 @@ int main(int argc, char **argv)
   if(rxbuf[0] != 0 || rxbuf[1] != 0)
     goto end;
 
-
-  // if not ch549 and rxbuf[0]= 0x00, rxbuf[1] = 0x00
-  // start write firmware.
+  // STEP 6: Write the firmware, first loop. 
   char small_buf[64];
  
-  // this is first time write. 
   int offset = 0;
   int copy_size = 60;
   len = copy_size + 4;
@@ -264,7 +259,8 @@ int main(int argc, char **argv)
   }
 
 
-  // this is second time write. 
+  // STEP 7: Write the firmware, second loop.
+  // The difference with first loop is small_buf[0]. 
   offset = 0;
   copy_size = 60;
   len = copy_size + 4;
@@ -310,7 +306,7 @@ int main(int argc, char **argv)
 		offset = offset + copy_size;
   }
 
-  // after program, quit IAP mode 
+  // STEP 8: After program, quit IAP mode 
   txbuf[0] = 0x83;
   txbuf[1] = 0x02;
   txbuf[2] = 0x00;
