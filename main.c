@@ -40,8 +40,8 @@ int main(int argc, char **argv)
     printf("\nUsage: wlink-iap <firmware file>.\n");
     printf("\nFirmwares can be extracted from WCH-LinkUtility.\n");
     printf("  FIRMWARE_CH32V305.bin:  WCH-LinkE(ch32v305)\n");
-    printf("  FIRMWARE_CH32V208.bin:  WCH-LinkB(ch32v208)");
-    printf("  FIRMWARE_CH32V203.bin:  WCH-LinkS(ch32v203)");
+    printf("  FIRMWARE_CH32V208.bin:  WCH-LinkB(ch32v208)\n");
+    printf("  FIRMWARE_CH32V203.bin:  WCH-LinkS(ch32v203)\n");
     printf("  FIRMWARE_CH549.bin:     WCH-Link(ch549) RV\n");
     printf("  FIRMWARE_DAP_CH549.bin: WCH-Link(ch549) DAP\n");
     exit(0);
@@ -257,7 +257,7 @@ int main(int argc, char **argv)
       goto end;
     }
 
-		offset = offset + copy_size;
+    offset = offset + copy_size;
   }
 
 
@@ -305,7 +305,7 @@ int main(int argc, char **argv)
       goto end;
     }
 
-		offset = offset + copy_size;
+    offset = offset + copy_size;
   }
 
   // STEP 8: After program, quit IAP mode 
