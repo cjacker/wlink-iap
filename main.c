@@ -88,7 +88,7 @@ int flash_firmware(struct libusb_device_handle * iap_handle, char *buffer, long 
 
     //first time write.
     //note the 0*2
-    small_buf[0] = loop*2 + 0x80;
+    small_buf[0] = loop*2 | 0x80;
     small_buf[1] = copy_size;
     small_buf[2] = offset;
     small_buf[3] = offset >>8;
@@ -146,7 +146,7 @@ int main(int argc, char **argv)
   //is arm dap
   int is_dap = 0;
 
-  //for rv mode, dap mode out is 2 and in is 0x83
+  //values for rv mode, dap mode out is 2 and in is 3(0x83)
   int endp_out = 1;
   int endp_in = 1;
 
