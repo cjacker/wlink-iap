@@ -33,7 +33,7 @@ Firmwares can be extracted from WCH-LinkUtility.
   FIRMWARE_DAP_CH549.bin: WCH-Link(ch549) DAP
 ```
 
-Plug WCH-Link to PC USB port and run:
+Plug WCH-Link/E to PC USB port, switch to RV mode (by `wlink mode-switch --rv`) and run:
 
 ```
 ./wlink-iap <firmware>
