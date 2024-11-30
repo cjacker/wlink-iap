@@ -226,8 +226,10 @@ int main(int argc, char **argv)
   long filesize = 0;
   char *buffer = NULL;  
   ret = load_firmware(firmware_file, &buffer, &filesize);
-  if(ret != 0)
+  if(ret != 0) {
+    fprintf(stderr, "Load firmware failed\n");
     goto end;
+  }
 
   // STEP 3: switch to IAP mode: 0x01010f81 len 4
   txbuf[0] = 0x81;
@@ -236,7 +238,6 @@ int main(int argc, char **argv)
   txbuf[3] = 0x01;
   len = 4;
   ret = pWriteData(wlink_handle, endp_out, txbuf, &len);
-
   if(ret != 0) {
     fprintf(stderr, "Set IAP mode failed\n");
     goto end;
@@ -264,7 +265,7 @@ int main(int argc, char **argv)
 
   ret = libusb_claim_interface(iap_handle, 0);
   if (ret !=  LIBUSB_SUCCESS) {
-    fprintf(stderr, "Claim interface error: %s", libusb_error_name(ret));
+    fprintf(stderr, "Claim interface failed: %s", libusb_error_name(ret));
     goto end;
   }
   
