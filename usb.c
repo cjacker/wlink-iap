@@ -6,7 +6,6 @@
 #include <sys/types.h>
 #include <string.h>
 #include <libusb.h>
-#include "errorcode.h"
 #include "usb.h"
 
 int jtag_libusb_bulk_write(struct libusb_device_handle *dev, int ep, char *bytes,
@@ -23,7 +22,7 @@ int jtag_libusb_bulk_write(struct libusb_device_handle *dev, int ep, char *bytes
     return ret;
   }
 
-  return ERROR_OK;
+  return 0;
 }
 
 int jtag_libusb_bulk_read(struct libusb_device_handle *dev, int ep, char *bytes,
@@ -40,7 +39,7 @@ int jtag_libusb_bulk_read(struct libusb_device_handle *dev, int ep, char *bytes,
     return ret;
   }
 
-  return ERROR_OK;
+  return 0;
 }
 
 
@@ -80,11 +79,11 @@ int jtag_libusb_open(const uint16_t vids[], const uint16_t pids[],
 		     struct libusb_device_handle **out, int *is_dap)
 {
   int cnt, idx, err_code;
-  int retval = ERROR_FAIL;
+  int retval = 1;
   struct libusb_device_handle *libusb_handle = NULL;
 
   if (libusb_init(&jtag_libusb_context) < 0)
-    return ERROR_FAIL;
+    return 1;
   cnt = libusb_get_device_list(jtag_libusb_context, &devs);
 
   struct libusb_device_descriptor dev_desc;
@@ -112,14 +111,14 @@ int jtag_libusb_open(const uint16_t vids[], const uint16_t pids[],
 
     /* Success. */
     *out = libusb_handle;
-    retval = ERROR_OK;
+    retval = 0;
     break;
   }
 
   if (cnt >= 0)
     libusb_free_device_list(devs, 1);
 
-  if (retval != ERROR_OK)
+  if (retval != 0)
     libusb_exit(jtag_libusb_context);
 
   return retval;

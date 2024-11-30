@@ -8,7 +8,6 @@
 #include <sys/stat.h>
 
 #include <libusb.h>
-#include "errorcode.h"
 #include "usb.h"
 
 static const uint16_t wlink_vids[] = {0x1a86, 0x1a86, 0};
@@ -21,14 +20,101 @@ static const uint16_t iap_pids[] = {0x55e0, 0};
 struct libusb_device_handle *iap_handle = NULL;
 
 
-// return true if the file specified
-// by the filename exists
-int file_exists(const char *filename)
+// 0 if file exists
+int file_not_exists(const char *filename)
 {
     struct stat buffer;
-    return stat(filename, &buffer) == 0;
+    return stat(filename, &buffer);
 }
 
+int load_firmware(char *filename, char **buffer, long *filesize) {
+  /* declare a file pointer */
+  FILE    *infile;
+
+  /* open an existing file for reading */
+  infile = fopen(filename, "r");
+
+  /* quit if the file does not exist */
+  if(infile == NULL)
+      return 1;
+
+  /* Get the number of bytes */
+  fseek(infile, 0L, SEEK_END);
+  *filesize = ftell(infile);
+
+  /* reset the file position indicator to
+  the beginning of the file */
+  fseek(infile, 0L, SEEK_SET);
+
+  /* grab sufficient memory for the
+  buffer to hold the text */
+  *buffer = (char*)calloc(*filesize, sizeof(char));
+
+  /* memory error */
+  if(*buffer == NULL)
+      return 1;
+
+  /* copy all the text into the buffer */
+  fread(*buffer, sizeof(char), *filesize, infile);
+  fclose(infile);
+  return 0; 
+}
+
+int flash_firmware(struct libusb_device_handle * iap_handle, char *buffer, long filesize, int loop)
+{
+  
+  unsigned char txbuf[6];
+  unsigned char rxbuf[20];
+  unsigned int len = 0;
+  unsigned int ret;
+
+  char small_buf[64];
+  int offset = 0;
+  int copy_size = 60;
+  len = copy_size + 4;
+
+ 
+  while(1) {
+    
+    if (offset >= filesize)
+      break;
+
+    if (offset+copy_size > filesize) {
+      copy_size = filesize - offset;
+    }
+
+    len = copy_size + 4;
+
+    memset(small_buf, 0, 64);
+
+    //first time write.
+    //note the 0*2
+    small_buf[0] = loop*2 + 0x80;
+    small_buf[1] = copy_size;
+    small_buf[2] = offset;
+    small_buf[3] = offset >>8;
+    memcpy(small_buf+4, buffer + offset, copy_size);
+
+    ret = pWriteData(iap_handle, 2, small_buf, &len);
+
+    if(ret != 0) {
+      fprintf(stderr, "Firmware write error\n");
+      return ret;
+    }
+
+    usleep(1000);
+    
+    len = 2;
+    ret = pReadData(iap_handle, 2, rxbuf, &len);
+    if(ret != 0 || rxbuf[0]!= 0x00 || rxbuf[1] != 0x00) {
+      fprintf(stderr, "Reply error\n");
+      return ret;
+    }
+
+    offset = offset + copy_size;
+  }
+  return 0;
+}
 
 // win32 Sleep(1) == linux usleep(1000);
 
@@ -49,7 +135,7 @@ int main(int argc, char **argv)
 
   // check firmware file exist or not.
   char *firmware_file = strdup(argv[1]);
-  if(!file_exists(firmware_file)) {
+  if(file_not_exists(firmware_file)) {
     fprintf(stderr,"Firmware \"%s\" not found!\n", firmware_file);
     exit(1);
   }
@@ -68,7 +154,7 @@ int main(int argc, char **argv)
 
   int ret;
 
-  if (jtag_libusb_open(wlink_vids, wlink_pids, &wlink_handle, &is_dap) != ERROR_OK)
+  if (jtag_libusb_open(wlink_vids, wlink_pids, &wlink_handle, &is_dap) != 0)
   {
     fprintf(stderr, "open wlink device failed\n");
     goto end;
@@ -76,7 +162,7 @@ int main(int argc, char **argv)
 
   jtag_libusb_set_configuration(wlink_handle, 0);
 
-  if (libusb_claim_interface(wlink_handle, 0) != ERROR_OK)
+  if (libusb_claim_interface(wlink_handle, 0) != 0)
   {
     fprintf(stderr, "claim wlink interface failed\n");
     goto end;
@@ -136,39 +222,12 @@ int main(int argc, char **argv)
   printf("######################################\n");
 
   
-  // STEP 2: load firmware to buffer 
-
-  /* declare a file pointer */
-  FILE    *infile;
-  char    *buffer;
-  long    filesize;
-
-  /* open an existing file for reading */
-  infile = fopen(firmware_file, "r");
-
-  /* quit if the file does not exist */
-  if(infile == NULL)
-      return 1;
-
-  /* Get the number of bytes */
-  fseek(infile, 0L, SEEK_END);
-  filesize = ftell(infile);
-
-  /* reset the file position indicator to
-  the beginning of the file */
-  fseek(infile, 0L, SEEK_SET);
-
-  /* grab sufficient memory for the
-  buffer to hold the text */
-  buffer = (char*)calloc(filesize, sizeof(char));
-
-  /* memory error */
-  if(buffer == NULL)
-      return 1;
-
-  /* copy all the text into the buffer */
-  fread(buffer, sizeof(char), filesize, infile);
-  fclose(infile);
+  // STEP 2: load firmware to buffer and get filesize. 
+  long filesize = 0;
+  char *buffer = NULL;  
+  ret = load_firmware(firmware_file, &buffer, &filesize);
+  if(ret != 0)
+    goto end;
 
   // STEP 3: switch to IAP mode: 0x01010f81 len 4
   txbuf[0] = 0x81;
@@ -178,7 +237,7 @@ int main(int argc, char **argv)
   len = 4;
   ret = pWriteData(wlink_handle, endp_out, txbuf, &len);
 
-  if(ret != ERROR_OK) {
+  if(ret != 0) {
     fprintf(stderr, "Set IAP mode failed\n");
     goto end;
   }
@@ -189,7 +248,7 @@ int main(int argc, char **argv)
 
   // STEP 4: open IAP device
   int not_needed; 
-  if (jtag_libusb_open(iap_vids, iap_pids, &iap_handle, &not_needed) != ERROR_OK)
+  if (jtag_libusb_open(iap_vids, iap_pids, &iap_handle, &not_needed) != 0)
   {
     fprintf(stderr, "Open iap device failed\n");
     goto end;
@@ -210,7 +269,6 @@ int main(int argc, char **argv)
   }
   
 
-
   // STEP 5: before flash the firmware.
   txbuf[0] = 0x81;
   txbuf[1] = 0x02;
@@ -218,7 +276,7 @@ int main(int argc, char **argv)
   txbuf[3] = 0x00;
   len = 4;
   ret = pWriteData(iap_handle, 2, txbuf, &len);
-  if(ret != ERROR_OK) {
+  if(ret != 0) {
     fprintf(stderr, "Prepare failed\n");
     goto end;
   }
@@ -227,7 +285,7 @@ int main(int argc, char **argv)
 
   len = 2;
   ret = pReadData(iap_handle, 2, rxbuf, &len);
-  if(ret != ERROR_OK) {
+  if(ret != 0) {
     fprintf(stderr, "Prepare failed\n");
     goto end;
   }
@@ -236,100 +294,14 @@ int main(int argc, char **argv)
     goto end;
 
   // STEP 6: Write the firmware, first loop. 
-  char small_buf[64];
- 
-  int offset = 0;
-  int copy_size = 60;
-  len = copy_size + 4;
-
- 
-  while(1) {
-    
-    if (offset >= filesize)
-      break;
-
-    if (offset+copy_size > filesize) {
-      copy_size = filesize - offset;
-    }
-
-    len = copy_size + 4;
-
-    memset(small_buf, 0, 64);
-
-    //first time write.
-    //note the 0*2
-    small_buf[0] = 0*2 + 0x80;
-    small_buf[1] = copy_size;
-    small_buf[2] = offset;
-    small_buf[3] = offset >>8;
-    memcpy(small_buf+4, buffer + offset, copy_size);
-
-    ret = pWriteData(iap_handle, 2, small_buf, &len);
-
-    if(ret != ERROR_OK) {
-      fprintf(stderr, "Firmware write error\n");
-      goto end;
-    }
-
-    usleep(1000);
-    
-    len = 2;
-    ret = pReadData(iap_handle, 2, rxbuf, &len);
-    if(ret != ERROR_OK || rxbuf[0]!= 0x00 || rxbuf[1] != 0x00) {
-      fprintf(stderr, "Reply error\n");
-      goto end;
-    }
-
-    offset = offset + copy_size;
-  }
-
+  ret = flash_firmware(iap_handle, buffer, filesize, 0);
+  if(ret != 0)
+    goto end;
 
   // STEP 7: Write the firmware, second loop.
-  // The difference with first loop is small_buf[0]. 
-  offset = 0;
-  copy_size = 60;
-  len = copy_size + 4;
-
-  while(1) {
-    
-    if (offset >= filesize)
-      break;
-
-    if (offset+copy_size > filesize) {
-      copy_size = filesize - offset;
-    }
-
-    len = copy_size + 4;
-
-    memset(small_buf, 0, 64);
-
-    //second time write.
-    //note the: 1*2
-    small_buf[0] = 1*2 + 0x80;
-    small_buf[1] = copy_size;
-    small_buf[2] = offset;
-    small_buf[3] = offset >>8;
-    memcpy(small_buf+4, buffer + offset, copy_size);
-
-    ret = pWriteData(iap_handle, 2, small_buf, &len);
-
-    if(ret != ERROR_OK) {
-      fprintf(stderr, "Firmware write error\n");
-      goto end;
-    }
-
-    usleep(1000);
-    
-    len = 2;
-    ret = pReadData(iap_handle, 2, rxbuf, &len);
-    
-    if(ret != ERROR_OK || rxbuf[0]!= 0x00 || rxbuf[1] != 0x00) {
-      fprintf(stderr, "Reply error\n");
-      goto end;
-    }
-
-    offset = offset + copy_size;
-  }
+  ret = flash_firmware(iap_handle, buffer, filesize, 1);
+  if(ret != 0)
+    goto end;
 
   // STEP 8: After program, quit IAP mode 
   txbuf[0] = 0x83;
@@ -338,13 +310,16 @@ int main(int argc, char **argv)
   txbuf[3] = 0x00;
   len = 4;
   ret = pWriteData(iap_handle, 2, txbuf, &len);
-  if(ret != ERROR_OK) {
+  if(ret != 0) {
     fprintf(stderr, "Quit IAP mode failed\n");
     goto end;
   }
 
   printf("Done!\n");
+
  end:
+  if(buffer)
+    free(buffer);
   //if(wlink_handle) 
   //  jtag_libusb_close(wlink_handle); 
   if(iap_handle) 
