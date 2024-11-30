@@ -56,16 +56,7 @@ int pReadData(libusb_device_handle *handle, int endpoint, unsigned char *buf, un
 {
   int ret, pr;
   length = (int *)length;
-  if (endpoint == 1)
-    {
-      ret = jtag_libusb_bulk_read(handle, 0x81, buf, *length, 3000, &pr);
-    }
-  else if (endpoint == 2)
-    {
-      ret = jtag_libusb_bulk_read(handle, 0x82, buf, *length, 3000, &pr);
-    }
-  else if (endpoint == 3)
-      ret = jtag_libusb_bulk_read(handle, 0x83, buf, *length, 3000, &pr);
+  ret = jtag_libusb_bulk_read(handle, endpoint|0x80, buf, *length, 3000, &pr);
   return ret;
 }
 
