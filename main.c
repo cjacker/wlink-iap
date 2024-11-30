@@ -11,8 +11,8 @@
 #include "errorcode.h"
 #include "usb.h"
 
-static const uint16_t wlink_vids[] = {0x1a86, 0};
-static const uint16_t wlink_pids[] = {0x8010, 0};
+static const uint16_t wlink_vids[] = {0x1a86, 0x1a86, 0};
+static const uint16_t wlink_pids[] = {0x8010, 0x8012, 0};
 struct libusb_device_handle *wlink_handle = NULL;
 
 //4348:55e0 WinChipHead
@@ -59,9 +59,16 @@ int main(int argc, char **argv)
   unsigned char rxbuf[20];
   unsigned int len = 5;
 
+  //is arm dap
+  int is_dap = 0;
+
+  //for rv mode, dap mode out is 2 and in is 0x83
+  int endp_out = 1;
+  int endp_in = 1;
+
   int ret;
 
-  if (jtag_libusb_open(wlink_vids, wlink_pids, &wlink_handle) != ERROR_OK)
+  if (jtag_libusb_open(wlink_vids, wlink_pids, &wlink_handle, &is_dap) != ERROR_OK)
   {
     fprintf(stderr, "open wlink device failed\n");
     goto end;
@@ -75,15 +82,23 @@ int main(int argc, char **argv)
     goto end;
   }
 
+  if (is_dap) {
+    endp_out = 2;
+    endp_in = 3;
+  }
+
   // STEP 1: Read adatper type and firmware version
   txbuf[0] = 0x81;
   txbuf[1] = 0x0d;
   txbuf[2] = 0x01;
   txbuf[3] = 0x01;
   len = 4;
-  pWriteData(wlink_handle, 1, txbuf, &len);
+  pWriteData(wlink_handle, endp_out, txbuf, &len);
+
+  usleep(1000);
+
   len = 7;
-  pReadData(wlink_handle, 1, rxbuf, &len);
+  pReadData(wlink_handle, endp_in, rxbuf, &len);
   printf("Adapter type:%x, version: v%d.%d\n", rxbuf[5], rxbuf[3], rxbuf[4]);
 
   // according to adapter type, find wchlinke chiptype and correct firmware
@@ -92,28 +107,33 @@ int main(int argc, char **argv)
   
   switch (rxbuf[5]) {
     case 1: 
-      printf("Found WCH-Link(ch549)\n");
+      printf("WCH-Link(ch549)\n");
       break;
     case 2:
     case 0x12:
-      printf("Found WCH-LinkE(ch32v305)\n");
+      printf("WCH-LinkE(ch32v305)\n");
       break;
     case 3:
-      printf("Found WCH-LinkS(ch32v203)\n");
+      printf("WCH-LinkS(ch32v203)\n");
       break;
     case 5:
     case 0x85:
-      printf("Found WCH-LinkB(ch32v208)\n");
+      printf("WCH-LinkB(ch32v208)\n");
       break;
     default:
-      printf("Not tested and not supported adapter\n");
+      printf("Unknown adapter\n");
       goto end;
   }
 
+  if(is_dap)
+    printf("DAP Mode\n");
+  else
+    printf("RV Mode\n");
+
   printf("Start flash the firmware...\n");
-  printf("###########################\n");
+  printf("######################################\n");
   printf("DO NOT UNPLUG WCH-Link/E until done!!!\n");
-  printf("###########################\n");
+  printf("######################################\n");
 
   
   // STEP 2: load firmware to buffer 
@@ -156,19 +176,20 @@ int main(int argc, char **argv)
   txbuf[2] = 0x01;
   txbuf[3] = 0x01;
   len = 4;
-  ret = pWriteData(wlink_handle, 1, txbuf, &len);
+  ret = pWriteData(wlink_handle, endp_out, txbuf, &len);
 
   if(ret != ERROR_OK) {
     fprintf(stderr, "Set IAP mode failed\n");
     goto end;
   }
-
+  
   // win32 Sleep(0xdac);
   // ch549 need enough time to enter IAP mode.
   usleep(3500*1000);
 
-  // STEP 4: open IAP device 
-  if (jtag_libusb_open(iap_vids, iap_pids, &iap_handle) != ERROR_OK)
+  // STEP 4: open IAP device
+  int not_needed; 
+  if (jtag_libusb_open(iap_vids, iap_pids, &iap_handle, &not_needed) != ERROR_OK)
   {
     fprintf(stderr, "Open iap device failed\n");
     goto end;
@@ -187,6 +208,8 @@ int main(int argc, char **argv)
     fprintf(stderr, "Claim interface error: %s", libusb_error_name(ret));
     goto end;
   }
+  
+
 
   // STEP 5: before flash the firmware.
   txbuf[0] = 0x81;
