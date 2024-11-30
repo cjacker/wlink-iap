@@ -10,9 +10,12 @@
 #include <libusb.h>
 #include "usb.h"
 
+//0x1a86:0x8010 RV mode
+//0x1a86:0x8012 DAP mode
 static const uint16_t wlink_vids[] = {0x1a86, 0x1a86, 0};
 static const uint16_t wlink_pids[] = {0x8010, 0x8012, 0};
 struct libusb_device_handle *wlink_handle = NULL;
+
 
 //4348:55e0 WinChipHead
 static const uint16_t iap_vids[] = {0x4348, 0};
@@ -27,14 +30,12 @@ int file_not_exists(const char *filename)
     return stat(filename, &buffer);
 }
 
+// load file with filename to buffer and set filesize.
 int load_firmware(char *filename, char **buffer, long *filesize) {
-  /* declare a file pointer */
   FILE    *infile;
 
-  /* open an existing file for reading */
   infile = fopen(filename, "r");
 
-  /* quit if the file does not exist */
   if(infile == NULL)
       return 1;
 
@@ -46,11 +47,8 @@ int load_firmware(char *filename, char **buffer, long *filesize) {
   the beginning of the file */
   fseek(infile, 0L, SEEK_SET);
 
-  /* grab sufficient memory for the
-  buffer to hold the text */
   *buffer = (char*)calloc(*filesize, sizeof(char));
 
-  /* memory error */
   if(*buffer == NULL)
       return 1;
 
@@ -60,6 +58,7 @@ int load_firmware(char *filename, char **buffer, long *filesize) {
   return 0; 
 }
 
+//Not sure the last param should be named 'loop'.
 int flash_firmware(struct libusb_device_handle * iap_handle, char *buffer, long filesize, int loop)
 {
   
@@ -116,7 +115,6 @@ int flash_firmware(struct libusb_device_handle * iap_handle, char *buffer, long 
   return 0;
 }
 
-// win32 Sleep(1) == linux usleep(1000);
 
 int main(int argc, char **argv)
 {
@@ -244,12 +242,13 @@ int main(int argc, char **argv)
   }
   
   // win32 Sleep(0xdac);
-  // ch549 need enough time to enter IAP mode.
+  // win32 Sleep(1) == linux usleep(1000);
+  // ch549 need to wait for a long time to enter IAP mode.
   usleep(3500*1000);
 
   // STEP 4: open IAP device
-  int not_needed; 
-  if (jtag_libusb_open(iap_vids, iap_pids, &iap_handle, &not_needed) != 0)
+  int _unused; 
+  if (jtag_libusb_open(iap_vids, iap_pids, &iap_handle, &_unused) != 0)
   {
     fprintf(stderr, "Open iap device failed\n");
     goto end;
