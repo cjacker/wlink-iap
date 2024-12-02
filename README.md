@@ -52,7 +52,7 @@ Plug WCH-Link/E to PC USB port and run:
 
 ## to enter IAP mode only
 
-If you want to erase code flash or/and re-program the whole firmware of WCH-LinkE, you have to enter IAP mode first by hold the 'IAP' button down when powerup, or by `wlink-iap -i`.
+If you want to erase code flash or/and re-program the whole firmware (firmwares with filename contains 'APP_IAP'), you have to enter IAP mode first by hold the 'IAP' button down when powerup, or by `wlink-iap -i`.
 
 This command is useful since official WCH-LinkE have a case and it's not convenient to hold the 'IAP' button down.
 
