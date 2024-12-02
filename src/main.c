@@ -10,6 +10,10 @@
 #include <libusb.h>
 #include "usb.h"
 
+// arguments
+#include "arg.h"
+char *argv0;
+
 //0x1a86:0x8010 RV mode
 //0x1a86:0x8012 DAP mode
 static const uint16_t wlink_vids[] = {0x1a86, 0x1a86, 0};
@@ -58,7 +62,7 @@ int load_firmware(char *filename, char **buffer, long *filesize) {
   return 0; 
 }
 
-//Not sure the last param should be named 'loop'.
+//Not sure whether the last param should be named 'loop'.
 int flash_firmware(struct libusb_device_handle * iap_handle, char *buffer, long filesize, int loop)
 {
   
@@ -115,28 +119,95 @@ int flash_firmware(struct libusb_device_handle * iap_handle, char *buffer, long 
   return 0;
 }
 
-
-int main(int argc, char **argv)
+void usage()
 {
-  if(argc != 2) {
     printf("A tool to upgrade / downgrade WCH-Link/E firmware.\n");
-    printf("By cjacker <cjacker@gmail.com>\n");
-    printf("\nUsage: wlink-iap <firmware file>.\n");
-    printf("\nFirmwares can be extracted from WCH-LinkUtility.\n");
+    printf("By cjacker <cjacker@gmail.com>\n\n");
+    printf("Usage:\n\n");
+    printf("wlink-iap -f <firmware file>\n");
+    printf("  Flash firmware.\n");
+    printf("  Firmwares can be extracted from WCH-LinkUtility.\n");
     printf("  FIRMWARE_CH32V305.bin:  WCH-LinkE(ch32v305)\n");
     printf("  FIRMWARE_CH32V208.bin:  WCH-LinkB(ch32v208)\n");
     printf("  FIRMWARE_CH32V203.bin:  WCH-LinkS(ch32v203)\n");
     printf("  FIRMWARE_CH549.bin:     WCH-Link(ch549) RV\n");
-    printf("  FIRMWARE_DAP_CH549.bin: WCH-Link(ch549) DAP\n");
+    printf("  FIRMWARE_DAP_CH549.bin: WCH-Link(ch549) DAP\n\n");
+    printf("wlink-iap -i\n");
+    printf("  Enter IAP mode and exit.\n\n");
+    printf("wlink-iap -q\n");
+    printf("  Quit IAP mode.\n\n");
+    exit(0);
+}
+
+int main(int argc, char **argv)
+{
+  // no args
+  if(argc == 1) {
+    usage();
+    exit(0);
+  }
+  
+  
+  char *firmware_file = NULL;
+  long filesize = 0;
+  char *buffer = NULL; 
+
+  //flags to call switch to IAP or quit IAP only.
+  int into_iap = 0;
+  int quit_iap = 0;
+
+  ARGBEGIN {
+  case 'f':
+    if(into_iap == 1 || quit_iap == 1) {
+      fprintf(stderr, "Don't use '-f' with '-i' or '-q'\n");
+      exit(1);
+    }
+    firmware_file = EARGF(usage());
+    break;
+  case 'i':
+    if(firmware_file || quit_iap == 1) {
+      fprintf(stderr, "Don't use '-i' with '-q' or '-f'\n");
+      exit(1);
+    }
+    into_iap = 1;
+    break;
+  case 'q':
+    if(firmware_file || into_iap == 1) {
+      fprintf(stderr, "Don't use '-q' with '-i' or '-f'\n");
+      exit(1);
+    }
+    quit_iap = 1;
+    break;
+  case 'h':
+    usage();
+    exit(0);
+  default:
+    usage();
+  }
+  ARGEND;
+
+  if(device_exists(0x1a86, 0x8010) != 0 &&
+		  device_exists(0x1a86, 0x8012) != 0 &&
+		  device_exists(0x4348, 0x55e0) != 0) {
+    fprintf(stderr, "WCH-Link/E device not found\n");
+    exit(1);
+  }
+
+  if(device_exists(0x4348, 0x55e0) == 0 && quit_iap != 1) {
+    printf("Maybe device already in IAP mode but not sure.\n");
+    printf("Try to quit IAP mode first by:\n");
+    printf("wlink-iap -q\n");
     exit(0);
   }
 
-  // check firmware file exist or not.
-  char *firmware_file = strdup(argv[1]);
-  if(file_not_exists(firmware_file)) {
+  if(file_not_exists(firmware_file) && quit_iap == 0 && into_iap == 0) {
     fprintf(stderr,"Firmware \"%s\" not found!\n", firmware_file);
     exit(1);
   }
+  
+  // if only want to quit IAP directly with '-q':
+  if(quit_iap == 1) 
+    goto open_iap_device;
 
 
   unsigned char txbuf[6];
@@ -191,18 +262,18 @@ int main(int argc, char **argv)
   
   switch (rxbuf[5]) {
     case 1: 
-      printf("WCH-Link(ch549)\n");
+      printf("WCH-Link(ch549)");
       break;
     case 2:
     case 0x12:
-      printf("WCH-LinkE(ch32v305)\n");
+      printf("WCH-LinkE(ch32v305)");
       break;
     case 3:
-      printf("WCH-LinkS(ch32v203)\n");
+      printf("WCH-LinkS(ch32v203)");
       break;
     case 5:
     case 0x85:
-      printf("WCH-LinkB(ch32v208)\n");
+      printf("WCH-LinkB(ch32v208)");
       break;
     default:
       printf("Unknown adapter\n");
@@ -210,26 +281,13 @@ int main(int argc, char **argv)
   }
 
   if(is_dap)
-    printf("DAP Mode\n");
+    printf(" in DAP Mode\n");
   else
-    printf("RV Mode\n");
-
-  printf("Start flash the firmware...\n");
-  printf("######################################\n");
-  printf("DO NOT UNPLUG WCH-Link/E until done!!!\n");
-  printf("######################################\n");
+    printf(" in RV Mode\n");
 
   
-  // STEP 2: load firmware to buffer and get filesize. 
-  long filesize = 0;
-  char *buffer = NULL;  
-  ret = load_firmware(firmware_file, &buffer, &filesize);
-  if(ret != 0) {
-    fprintf(stderr, "Load firmware failed\n");
-    goto end;
-  }
-
-  // STEP 3: switch to IAP mode: 0x01010f81 len 4
+  // STEP 2: switch to IAP mode: 0x01010f81 len 4
+  printf("Switch to IAP mode.\n");
   txbuf[0] = 0x81;
   txbuf[1] = 0x0f;
   txbuf[2] = 0x01;
@@ -241,12 +299,34 @@ int main(int argc, char **argv)
     goto end;
   }
   
+  if(into_iap == 1) {
+    if(device_exists(0x4348, 0x55e0))
+    //check whether IAP device exists.
+      printf("Now in IAP mode.\n");
+    exit(0);
+  }
+
+
+  // STEP 3: load firmware to buffer and get filesize. 
+  ret = load_firmware(firmware_file, &buffer, &filesize);
+  if(ret != 0) {
+    fprintf(stderr, "Load firmware failed\n");
+    goto end;
+  }
+
+  printf("Start flash the firmware...\n");
+  printf("######################################\n");
+  printf("DO NOT UNPLUG WCH-Link/E until done!!!\n");
+  printf("######################################\n");
+
+
+  // STEP 4: open IAP device
+open_iap_device:
   // win32 Sleep(0xdac);
   // win32 Sleep(1) == linux usleep(1000);
   // ch549 need to wait for a long time to enter IAP mode.
   usleep(3500*1000);
 
-  // STEP 4: open IAP device
   int _unused; 
   if (jtag_libusb_open(iap_vids, iap_pids, &iap_handle, &_unused) != 0)
   {
@@ -268,6 +348,10 @@ int main(int argc, char **argv)
     goto end;
   }
   
+
+  // if call quit IAP mode directly, skip firmware flashing process. 
+  if(quit_iap == 1)
+    goto quit_iap_mode; 
 
   // STEP 5: before flash the firmware.
   txbuf[0] = 0x81;
@@ -303,7 +387,9 @@ int main(int argc, char **argv)
   if(ret != 0)
     goto end;
 
+quit_iap_mode:
   // STEP 8: After program, quit IAP mode 
+  printf("Quit IAP mode\n");
   txbuf[0] = 0x83;
   txbuf[1] = 0x02;
   txbuf[2] = 0x00;
@@ -314,8 +400,9 @@ int main(int argc, char **argv)
     fprintf(stderr, "Quit IAP mode failed\n");
     goto end;
   }
-
+  
   printf("Done!\n");
+
 
  end:
   if(buffer)

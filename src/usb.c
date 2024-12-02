@@ -75,6 +75,32 @@ static bool jtag_libusb_match_ids(struct libusb_device_descriptor *dev_desc,
 }
 
 
+int device_exists(uint16_t vid, uint16_t pid)
+{
+  struct libusb_context *context; /**< Libusb context **/
+  struct libusb_device **devs; /**< The usb device list **/
+  if (libusb_init(&context) < 0)
+    return 1;
+  int count = libusb_get_device_list(context, &devs);
+
+  struct libusb_device_descriptor desc;
+
+  for (int i = 0; i < count; i++) {
+    if (libusb_get_device_descriptor(devs[i], &desc) != 0)
+      continue;
+    if(desc.idVendor == vid && desc.idProduct == pid) {
+      //found
+      return 0;
+    } 
+  }
+  if (count >= 0)
+    libusb_free_device_list(devs, 1);
+
+  if (context)
+    libusb_exit(context);
+  return 1;
+}
+
 int jtag_libusb_open(const uint16_t vids[], const uint16_t pids[],
 		     struct libusb_device_handle **out, int *is_dap)
 {

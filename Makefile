@@ -1,7 +1,8 @@
 DESTDIR=
 
 all:
-	gcc -o wlink-iap main.c usb.c `pkg-config --libs --cflags libusb-1.0`
-
+	make -C src
 clean:
-	rm -f wlink-iap
+	make clean -C src
+install:
+	make install -C src DESTDIR=$(DESTDIR)
