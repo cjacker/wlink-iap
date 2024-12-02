@@ -291,11 +291,10 @@ int main(int argc, char **argv)
   }
   
   char *firmware_file = NULL;
-  long filesize = 0;
-  char *buffer = NULL; 
 
-  //flags to call switch to IAP or quit IAP only.
+  //flag to call switch to IAP only.
   int into_iap = 0;
+  //flag to call quit IAP only.
   int quit_iap = 0;
 
   ARGBEGIN {
@@ -328,7 +327,7 @@ int main(int argc, char **argv)
   }
   ARGEND;
 
-  //Whether there is wchlink or wchlink in IAP mode?
+  //Whether there is wchlink or wchlink?
   if(device_exists(0x1a86, 0x8010) != 0 &&
 		  device_exists(0x1a86, 0x8012) != 0 &&
 		  device_exists(0x4348, 0x55e0) != 0) {
@@ -367,7 +366,6 @@ int main(int argc, char **argv)
   const uint16_t iap_pids[] = {0x55e0, 0};
   struct libusb_device_handle *iap_handle = NULL;
 
- 
   //values for rv mode, dap mode out is 2 and in is 3(0x83)
   int endp_out = 1;
   int endp_in = 1;
@@ -442,6 +440,9 @@ int main(int argc, char **argv)
   // If 'into_iap' only, the filename will be null.
   //
   // STEP 3: load firmware to buffer and get filesize.
+  long filesize = 0;
+  char *buffer = NULL; 
+
   ret = load_firmware(firmware_file, &buffer, &filesize);
   if(ret != 0) {
     fprintf(stderr, "Fail to load firmware file.\n");
