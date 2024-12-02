@@ -276,7 +276,7 @@ void usage()
     printf("  FIRMWARE_CH32V208.bin:  WCH-LinkB(ch32v208)\n");
     printf("  FIRMWARE_CH32V203.bin:  WCH-LinkS(ch32v203)\n\n");
     printf("wlink-iap -i\n");
-    printf("  Enter IAP mode and exit.\n\n");
+    printf("  Enter IAP mode.\n\n");
     printf("wlink-iap -q\n");
     printf("  Quit IAP mode.\n\n");
     exit(0);
@@ -472,10 +472,12 @@ int main(int argc, char **argv)
   ret = before_flash_firmware(iap_handle);
   if(ret != 0) {
     //I cann't figure out what is this command.
+    //Maybe it's something related to erase,
+    //Or tell IAP loader prepare to receive firmware.
     //fprintf(stderr, "Fail to do something.\n");
     goto end;
   }
-
+  
   // STEP 6: Write the firmware, first loop. 
   ret = flash_firmware(iap_handle, buffer, filesize, 0);
   if(ret != 0) {
@@ -489,7 +491,7 @@ int main(int argc, char **argv)
 		fprintf(stderr,"Fail to flash firmware.\n");
     goto end;
   }
-
+  
   // STEP 8: After program, quit IAP mode 
   ret = quit_iap_mode(iap_handle);
   if(ret != 0) {
