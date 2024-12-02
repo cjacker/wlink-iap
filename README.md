@@ -65,7 +65,7 @@ If WCH-LinkE was switched to IAP mode accidently, for example, user want to swit
 
 # Firmwares:
 
-I put the WCH-Link(CH549) and WCH-LinkE(CH32V) firmwares in this repo, for other unusual models, you can download and extract firmwares from WCH-LinkUtility.
+I put the WCH-Link(CH549) and WCH-LinkE(CH32V) firmwares (v2.8 and v2.15) in this repo, for other unusual models, you can download and extract firmwares from WCH-LinkUtility.
 
 # Info:
 
