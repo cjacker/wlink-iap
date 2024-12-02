@@ -14,18 +14,6 @@
 #include "arg.h"
 char *argv0;
 
-//0x1a86:0x8010 RV mode
-//0x1a86:0x8012 DAP mode
-static const uint16_t wlink_vids[] = {0x1a86, 0x1a86, 0};
-static const uint16_t wlink_pids[] = {0x8010, 0x8012, 0};
-struct libusb_device_handle *wlink_handle = NULL;
-
-
-//4348:55e0 WinChipHead
-static const uint16_t iap_vids[] = {0x4348, 0};
-static const uint16_t iap_pids[] = {0x55e0, 0};
-struct libusb_device_handle *iap_handle = NULL;
-
 
 // 0 if file exists
 int file_not_exists(const char *filename)
@@ -119,6 +107,166 @@ int flash_firmware(struct libusb_device_handle * iap_handle, char *buffer, long 
   return 0;
 }
 
+// open usb device and return a handle
+// sucess ret 0, fail ret 1
+int open_device(const uint16_t vids[],
+    const uint16_t pids[],
+    struct libusb_device_handle **handle) {
+  if (jtag_libusb_open(vids, pids, handle) != 0)
+  {
+    fprintf(stderr, "Fail to open usb device.\n");
+		return 1;
+  }
+
+  jtag_libusb_set_configuration(*handle, 0);
+
+  if(libusb_kernel_driver_active(*handle, 0) == 1)
+  {
+    if(libusb_detach_kernel_driver(*handle, 0) != 0)
+      fprintf(stderr, "Couldn't detach kernel driver!\n");
+  }
+
+  int ret = libusb_claim_interface(*handle, 0);
+  if(ret != LIBUSB_SUCCESS) {
+    fprintf(stderr, "Claim interface failed: %s", libusb_error_name(ret));
+		return 1;
+  }
+  return 0;
+}
+
+
+  //printf("Switch to IAP mode.\n");
+int switch_to_iap_mode(struct libusb_device_handle *wlink_handle, int endp_out) {
+  unsigned char txbuf[6];
+  unsigned char rxbuf[20];
+  unsigned int len = 5;
+	int ret;
+
+  txbuf[0] = 0x81;
+  txbuf[1] = 0x0f;
+  txbuf[2] = 0x01;
+  txbuf[3] = 0x01;
+  len = 4;
+  ret = pWriteData(wlink_handle, endp_out, txbuf, &len);
+  if(ret != 0) {
+		return 1;
+  }
+
+  usleep(1000);
+
+  if(device_exists(0x4348, 0x55e0))
+    return 0;
+
+  return 1;
+}
+
+int before_flash_firmware(struct libusb_device_handle *iap_handle) {
+  unsigned char txbuf[6];
+  unsigned char rxbuf[20];
+  unsigned int len = 5;
+	int ret;
+
+  txbuf[0] = 0x81;
+  txbuf[1] = 0x02;
+  txbuf[2] = 0x00;
+  txbuf[3] = 0x00;
+  len = 4;
+
+  ret = pWriteData(iap_handle, 2, txbuf, &len);
+  if(ret != 0)
+		return 1;
+
+  usleep(1000);
+
+  len = 2;
+  ret = pReadData(iap_handle, 2, rxbuf, &len);
+  if(ret != 0)
+		return 1;
+  // expect 0x00, 0x00
+  if(rxbuf[0] != 0 || rxbuf[1] != 0)
+		return 1;
+
+	return 0;
+}
+
+int quit_iap_mode(struct libusb_device_handle *iap_handle) {
+  unsigned char txbuf[6];
+  unsigned char rxbuf[20];
+  unsigned int len = 5;
+	int ret;
+
+  txbuf[0] = 0x83;
+  txbuf[1] = 0x02;
+  txbuf[2] = 0x00;
+  txbuf[3] = 0x00;
+  len = 4;
+  ret = pWriteData(iap_handle, 2, txbuf, &len);
+  if(ret != 0)
+		return 1;
+	return 0;
+}
+
+
+// adapter type and version info can be used to
+// 1, find the correct firmware
+// 2, compare version.
+// but these infos are not used by wlink-iap, only display it.
+int get_wchlink_info(struct libusb_device_handle *wlink_handle,
+    int endp_out, int endp_in) {
+  unsigned char txbuf[6];
+  unsigned char rxbuf[20];
+  unsigned int len = 5;
+	int ret;
+
+  txbuf[0] = 0x81;
+  txbuf[1] = 0x0d;
+  txbuf[2] = 0x01;
+  txbuf[3] = 0x01;
+  len = 4;
+  ret = pWriteData(wlink_handle, endp_out, txbuf, &len);
+
+  if(ret != 0)
+    return 1;
+
+  usleep(1000);
+
+  len = 7;
+  ret = pReadData(wlink_handle, endp_in, rxbuf, &len);
+  if(ret != 0)
+    return 1;
+
+  // according to adapter type, find wchlinke chiptype and correct firmware
+  // and compare version info with "wchlink.wcfg"
+  // for adapter type 0x02 and 0x12, it's WCH-LinkE: FIRMWARE_CH32V203.BIN
+ 
+  printf("Found device : ");
+
+  switch (rxbuf[5]) {
+    case 1: 
+      printf("WCH-Link(ch549)");
+      break;
+    case 2:
+    case 0x12:
+      printf("WCH-LinkE(ch32v305)");
+      break;
+    case 3:
+      printf("WCH-LinkS(ch32v203)");
+      break;
+    case 5:
+    case 0x85:
+      printf("WCH-LinkB(ch32v208)");
+      break;
+    default:
+      printf("Unknown adapter\n");
+      return 1;
+  }
+  
+  printf(" with firmware version v%d.%d\n", rxbuf[3], rxbuf[4]);
+
+  return 0;
+}
+
+
 void usage()
 {
     printf("A tool to upgrade / downgrade WCH-Link/E firmware.\n");
@@ -146,6 +294,7 @@ int main(int argc, char **argv)
     usage();
     exit(0);
   }
+
   
   
   char *firmware_file = NULL;
@@ -205,213 +354,147 @@ int main(int argc, char **argv)
     exit(1);
   }
   
-  // if only want to quit IAP directly with '-q':
-  if(quit_iap == 1) 
-    goto open_iap_device;
+  //0x1a86:0x8010 RV mode
+  //0x1a86:0x8012 DAP mode
+  const uint16_t wlink_vids[] = {0x1a86, 0x1a86, 0};
+  const uint16_t wlink_pids[] = {0x8010, 0x8012, 0};
+  struct libusb_device_handle *wlink_handle = NULL;
 
 
-  unsigned char txbuf[6];
-  unsigned char rxbuf[20];
-  unsigned int len = 5;
+  //4348:55e0 WinChipHead
+  const uint16_t iap_vids[] = {0x4348, 0};
+  const uint16_t iap_pids[] = {0x55e0, 0};
+  struct libusb_device_handle *iap_handle = NULL;
 
-  //is arm dap
-  int is_dap = 0;
-
+ 
   //values for rv mode, dap mode out is 2 and in is 3(0x83)
   int endp_out = 1;
   int endp_in = 1;
-
-  int ret;
-
-  if (jtag_libusb_open(wlink_vids, wlink_pids, &wlink_handle, &is_dap) != 0)
-  {
-    fprintf(stderr, "open wlink device failed\n");
-    goto end;
-  }
-
-  jtag_libusb_set_configuration(wlink_handle, 0);
-
-  if (libusb_claim_interface(wlink_handle, 0) != 0)
-  {
-    fprintf(stderr, "claim wlink interface failed\n");
-    goto end;
-  }
-
-  if (is_dap) {
+ 
+  // if in DAP mode, setup endp_out/endp_i
+  if(device_exists(0x1a86, 0x8012) == 0) {
     endp_out = 2;
     endp_in = 3;
-  }
+  } 
+  
+  // if only want to quit IAP directly with '-q':
+  if(quit_iap == 1) {
+    if(open_device(iap_vids, iap_pids, &iap_handle) != 0) {
+      if(iap_handle)
+        jtag_libusb_close(iap_handle);
+        exit(1);
+    }
+
+    printf("Quit IAP mode \n");
+    if(quit_iap_mode(iap_handle) != 0) 
+      printf("Failed\n");
+    else
+      printf("Done\n");
+
+    if(iap_handle)
+        jtag_libusb_close(iap_handle);
+
+		exit(0);
+  } 
+
+
+  // open wlink device.
+  if(open_device(wlink_vids, wlink_pids, &wlink_handle) != 0) {
+    if(wlink_handle)
+      jtag_libusb_close(wlink_handle);
+    exit(1);
+  } 
+  
+  unsigned char txbuf[6];
+  unsigned char rxbuf[20];
+  unsigned int len = 5;
+  int ret;
 
   // STEP 1: Read adatper type and firmware version
-  txbuf[0] = 0x81;
-  txbuf[1] = 0x0d;
-  txbuf[2] = 0x01;
-  txbuf[3] = 0x01;
-  len = 4;
-  pWriteData(wlink_handle, endp_out, txbuf, &len);
-
-  usleep(1000);
-
-  len = 7;
-  pReadData(wlink_handle, endp_in, rxbuf, &len);
-  printf("Adapter type:%x, version: v%d.%d\n", rxbuf[5], rxbuf[3], rxbuf[4]);
-
-  // according to adapter type, find wchlinke chiptype and correct firmware
-  // and compare version info with "wchlink.wcfg"
-  // for adapter type 0x02 and 0x12, it's WCH-LinkE: FIRMWARE_CH32V203.BIN
-  
-  switch (rxbuf[5]) {
-    case 1: 
-      printf("WCH-Link(ch549)");
-      break;
-    case 2:
-    case 0x12:
-      printf("WCH-LinkE(ch32v305)");
-      break;
-    case 3:
-      printf("WCH-LinkS(ch32v203)");
-      break;
-    case 5:
-    case 0x85:
-      printf("WCH-LinkB(ch32v208)");
-      break;
-    default:
-      printf("Unknown adapter\n");
-      goto end;
+  ret = get_wchlink_info(wlink_handle, endp_out, endp_in);
+  if(ret != 0) {
+    fprintf(stderr, "Fail to get WCH-Link/E info.");
+    if(wlink_handle)
+      jtag_libusb_close(wlink_handle);
+    exit(1);
   }
 
-  if(is_dap)
-    printf(" in DAP Mode\n");
-  else
-    printf(" in RV Mode\n");
-
-  
   // STEP 2: switch to IAP mode: 0x01010f81 len 4
   printf("Switch to IAP mode.\n");
-  txbuf[0] = 0x81;
-  txbuf[1] = 0x0f;
-  txbuf[2] = 0x01;
-  txbuf[3] = 0x01;
-  len = 4;
-  ret = pWriteData(wlink_handle, endp_out, txbuf, &len);
+  ret = switch_to_iap_mode(wlink_handle, endp_out);
   if(ret != 0) {
-    fprintf(stderr, "Set IAP mode failed\n");
-    goto end;
+    fprintf(stderr,"Fail to switch to IAP mode.\n");
+    exit(1);
   }
-  
+ 
+  // if 'wlink-iap -i'
   if(into_iap == 1) {
-    if(device_exists(0x4348, 0x55e0))
-    //check whether IAP device exists.
-      printf("Now in IAP mode.\n");
+    printf("Done!\n");
     exit(0);
-  }
-
+  } 
 
   // STEP 3: load firmware to buffer and get filesize. 
   ret = load_firmware(firmware_file, &buffer, &filesize);
   if(ret != 0) {
     fprintf(stderr, "Load firmware failed\n");
-    goto end;
+    exit(1);
   }
 
+  // READY, go
   printf("Start flash the firmware...\n");
   printf("######################################\n");
   printf("DO NOT UNPLUG WCH-Link/E until done!!!\n");
   printf("######################################\n");
 
 
-  // STEP 4: open IAP device
-open_iap_device:
   // win32 Sleep(0xdac);
   // win32 Sleep(1) == linux usleep(1000);
   // ch549 need to wait for a long time to enter IAP mode.
   usleep(3500*1000);
 
-  int _unused; 
-  if (jtag_libusb_open(iap_vids, iap_pids, &iap_handle, &_unused) != 0)
-  {
-    fprintf(stderr, "Open iap device failed\n");
+  // STEP 4: open IAP device
+  ret = open_device(iap_vids, iap_pids, &iap_handle);
+
+  if(ret != 0) {
+    fprintf(stderr, "Fail to open IAP device.\n");
     goto end;
   }
-
-  jtag_libusb_set_configuration(iap_handle, 0);
-
-  if(libusb_kernel_driver_active(iap_handle, 0) == 1)
-  {
-    if(libusb_detach_kernel_driver(iap_handle, 0) != 0)
-      fprintf(stderr, "Couldn't detach kernel driver!\n");
-  }
-
-  ret = libusb_claim_interface(iap_handle, 0);
-  if (ret !=  LIBUSB_SUCCESS) {
-    fprintf(stderr, "Claim interface failed: %s", libusb_error_name(ret));
-    goto end;
-  }
-  
-
-  // if call quit IAP mode directly, skip firmware flashing process. 
-  if(quit_iap == 1)
-    goto quit_iap_mode; 
 
   // STEP 5: before flash the firmware.
-  txbuf[0] = 0x81;
-  txbuf[1] = 0x02;
-  txbuf[2] = 0x00;
-  txbuf[3] = 0x00;
-  len = 4;
-  ret = pWriteData(iap_handle, 2, txbuf, &len);
+  ret = before_flash_firmware(iap_handle);
   if(ret != 0) {
-    fprintf(stderr, "Prepare failed\n");
+    //fprintf(stderr, "Fail to do something.\n");
     goto end;
   }
-  
-  usleep(1000);
-
-  len = 2;
-  ret = pReadData(iap_handle, 2, rxbuf, &len);
-  if(ret != 0) {
-    fprintf(stderr, "Prepare failed\n");
-    goto end;
-  }
-  // should be 0x0000
-  if(rxbuf[0] != 0 || rxbuf[1] != 0)
-    goto end;
 
   // STEP 6: Write the firmware, first loop. 
   ret = flash_firmware(iap_handle, buffer, filesize, 0);
-  if(ret != 0)
+  if(ret != 0) {
+		fprintf(stderr,"Fail to flash firmware.\n");
     goto end;
+  }
 
   // STEP 7: Write the firmware, second loop.
   ret = flash_firmware(iap_handle, buffer, filesize, 1);
-  if(ret != 0)
-    goto end;
-
-quit_iap_mode:
-  // STEP 8: After program, quit IAP mode 
-  printf("Quit IAP mode\n");
-  txbuf[0] = 0x83;
-  txbuf[1] = 0x02;
-  txbuf[2] = 0x00;
-  txbuf[3] = 0x00;
-  len = 4;
-  ret = pWriteData(iap_handle, 2, txbuf, &len);
   if(ret != 0) {
-    fprintf(stderr, "Quit IAP mode failed\n");
+		fprintf(stderr,"Fail to flash firmware.\n");
+    goto end;
+  }
+
+  // STEP 8: After program, quit IAP mode 
+  ret = quit_iap_mode(iap_handle);
+  if(ret != 0) {
+		fprintf(stderr,"Fail to quit IAP mode.\n");
     goto end;
   }
   
   printf("Done!\n");
 
-
- end:
+end: 
   if(buffer)
     free(buffer);
-  //if(wlink_handle) 
-  //  jtag_libusb_close(wlink_handle); 
   if(iap_handle) 
-    jtag_libusb_close(iap_handle); 
-  return 0;
+    jtag_libusb_close(iap_handle);
 }
 
 

@@ -102,7 +102,7 @@ int device_exists(uint16_t vid, uint16_t pid)
 }
 
 int jtag_libusb_open(const uint16_t vids[], const uint16_t pids[],
-		     struct libusb_device_handle **out, int *is_dap)
+		     struct libusb_device_handle **out)
 {
   int cnt, idx, err_code;
   int retval = 1;
@@ -130,11 +130,6 @@ int jtag_libusb_open(const uint16_t vids[], const uint16_t pids[],
       continue;
     }
    
-    // detect WCH-Link in DAP mode or not. 
-    if(dev_desc.idProduct == 0x8012) {
-      *is_dap = 1;
-    }
-
     /* Success. */
     *out = libusb_handle;
     retval = 0;
