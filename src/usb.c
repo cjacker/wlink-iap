@@ -8,7 +8,7 @@
 #include <libusb.h>
 #include "usb.h"
 
-int jtag_libusb_bulk_write(struct libusb_device_handle *dev, int ep, char *bytes,
+int jtag_libusb_bulk_write(struct libusb_device_handle *dev, int ep, unsigned char *bytes,
                            int size, int timeout, int *transferred)
 {
   int ret;
@@ -25,7 +25,7 @@ int jtag_libusb_bulk_write(struct libusb_device_handle *dev, int ep, char *bytes
   return 0;
 }
 
-int jtag_libusb_bulk_read(struct libusb_device_handle *dev, int ep, char *bytes,
+int jtag_libusb_bulk_read(struct libusb_device_handle *dev, int ep, unsigned char *bytes,
                           int size, int timeout, int *transferred)
 {
   int ret;
@@ -46,7 +46,7 @@ int jtag_libusb_bulk_read(struct libusb_device_handle *dev, int ep, char *bytes,
 int pWriteData(libusb_device_handle *handle, int endpoint, unsigned char *buf, unsigned int *length)
 {
   int ret, pr;
-  length = (int *)length;
+  length = (unsigned int *)length;
   ret = jtag_libusb_bulk_write(handle, endpoint, buf, *length, 3000, &pr);
   return ret;
 }
@@ -54,7 +54,7 @@ int pWriteData(libusb_device_handle *handle, int endpoint, unsigned char *buf, u
 int pReadData(libusb_device_handle *handle, int endpoint, unsigned char *buf, unsigned int *length)
 {
   int ret, pr;
-  length = (int *)length;
+  length = (unsigned int *)length;
   ret = jtag_libusb_bulk_read(handle, endpoint|0x80, buf, *length, 3000, &pr);
   return ret;
 }

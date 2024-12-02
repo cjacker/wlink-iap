@@ -59,7 +59,7 @@ int flash_firmware(struct libusb_device_handle * iap_handle,
   unsigned int len = 0;
   unsigned int ret;
 
-  char small_buf[64];
+  unsigned char small_buf[64];
   int offset = 0;
   int copy_size = 60;
   len = copy_size + 4;
