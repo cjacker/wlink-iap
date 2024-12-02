@@ -42,7 +42,7 @@ wlink-iap -q
   Quit IAP mode.
 ```
 
-## to flash (upgrade or downgrade) WCH-Link/E firmware:
+## to flash (upgrade or downgrade) WCH-Link/E firmware using IAP method:
 
 Plug WCH-Link/E to PC USB port and run:
 
