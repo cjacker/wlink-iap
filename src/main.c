@@ -210,6 +210,9 @@ int quit_iap_mode(struct libusb_device_handle *iap_handle) {
 // 1, find the correct firmware.
 // 2, compare version with wchlink.cfg and determine update or not.
 // Here only display to screen.
+//
+// It's not neccesary to compare the version since wlink-iap support 
+// downgrade the firmware. 
 int get_wchlink_info(struct libusb_device_handle *wlink_handle,
     int endp_out, int endp_in) {
   unsigned char txbuf[6];
@@ -255,7 +258,10 @@ int get_wchlink_info(struct libusb_device_handle *wlink_handle,
       printf("Unknown adapter\n");
       return 1;
   }
-  
+ 
+  // display version
+  // Version in wchlink.wcfg is "rxbuf[3]*10 + rxbuf[4]"
+  // But in wch-openocd, it's "rxbuf[3].rxbuf[4]"
   printf(" with firmware v%d.%d\n", rxbuf[3], rxbuf[4]);
 
   return 0;
@@ -284,7 +290,7 @@ void usage()
 
 int main(int argc, char **argv)
 {
-  // no args
+  // no args, display usage and exit
   if(argc == 1) {
     usage();
     exit(0);
@@ -292,9 +298,9 @@ int main(int argc, char **argv)
   
   char *firmware_file = NULL;
 
-  //flag to call switch to IAP only.
+  // flag to call switch to IAP only.
   int into_iap = 0;
-  //flag to call quit IAP only.
+  // flag to call quit IAP only.
   int quit_iap = 0;
 
   ARGBEGIN {
@@ -327,7 +333,7 @@ int main(int argc, char **argv)
   }
   ARGEND;
 
-  //Whether there is wchlink or wchlink?
+  // Check device existance
   if(device_exists(0x1a86, 0x8010) != 0 &&
 		  device_exists(0x1a86, 0x8012) != 0 &&
 		  device_exists(0x4348, 0x55e0) != 0) {
@@ -335,9 +341,9 @@ int main(int argc, char **argv)
     exit(1);
   }
 
-  //If found 0x4348, 0x55e0, it maybe a wchlink already in IAP mode,
-  //And maybe some other devices we don't know.
-  //Let's user try to quit IAP mode first.
+  // If found 0x4348, 0x55e0, it maybe a wchlink already in IAP mode,
+  // And maybe some other devices we don't know.
+  // Let user try to quit IAP mode first.
   if(device_exists(0x4348, 0x55e0) == 0 && quit_iap != 1) {
     printf("Maybe WCH-Link/E already in IAP mode, but I'm not sure.\n");
     printf("Please try to quit IAP mode first by:\n\n");
@@ -345,9 +351,9 @@ int main(int argc, char **argv)
     exit(0);
   }
 
-  // only check it exist or not.
-  // check it early
-  // since I don't want to load firmware before switch to IAP mode.
+  // only check file existance here.
+  // check it early to better handle into_iap == 1,
+  // avoid load firmware before switch to IAP mode.
   if(quit_iap == 0 && into_iap == 0 && 
       file_not_exists(firmware_file)) {
     fprintf(stderr,"Firmware \"%s\" not found!\n", firmware_file);
@@ -366,17 +372,17 @@ int main(int argc, char **argv)
   const uint16_t iap_pids[] = {0x55e0, 0};
   struct libusb_device_handle *iap_handle = NULL;
 
-  //values for rv mode, dap mode out is 2 and in is 3(0x83)
+  // setup endp_out/in for RV mode.
   int endp_out = 1;
   int endp_in = 1;
  
-  // if in DAP mode, setup endp_out/endp_i
+  // setup endp_out/in for DAP mode.
   if(device_exists(0x1a86, 0x8012) == 0) {
     endp_out = 2;
     endp_in = 3;
   } 
   
-  // if only want to quit IAP directly with '-q':
+  // with '-q', quit IAP mode directly.
   if(quit_iap == 1) {
     //open IAP device.
     if(open_device(iap_vids, iap_pids, &iap_handle) != 0) {
@@ -398,7 +404,6 @@ int main(int argc, char **argv)
 
 		exit(0);
   } 
-
 
 
   int ret;
