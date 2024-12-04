@@ -14,11 +14,6 @@
 #include "arg.h"
 char *argv0;
 
-
-#define DOWNLOAD 0x80
-#define VERIFY 0x82
-
-
 // ret 0 if file exists
 int file_not_exists(const char *filename)
 {
@@ -485,14 +480,14 @@ int main(int argc, char **argv)
   }
   
   // STEP 6: first loop, download the firmware.
-  ret = flash_firmware(iap_handle, buffer, filesize, DOWNLOAD);
+  ret = flash_firmware(iap_handle, buffer, filesize, 0x80);
   if(ret != 0) {
 		fprintf(stderr,"Fail to download firmware.\n");
     goto end;
   }
 
   // STEP 7: second loop, verify the firmware
-  ret = flash_firmware(iap_handle, buffer, filesize, VERIFY);
+  ret = flash_firmware(iap_handle, buffer, filesize, 0x82);
   if(ret != 0) {
 		fprintf(stderr,"Fail to verify firmware.\n");
     goto end;
