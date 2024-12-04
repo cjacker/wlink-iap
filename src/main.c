@@ -49,9 +49,10 @@ int load_firmware(char *filename, char **buffer, long *filesize) {
   return 0; 
 }
 
-//Not sure whether the last param should be named 'loop'.
-int flash_firmware(struct libusb_device_handle * iap_handle,
-    char *buffer, long filesize, int loop)
+// download: small_buf[0] == 0x80
+// verify: small_buf[0] == 0x82
+int download_or_verify_firmware(struct libusb_device_handle * iap_handle,
+    char *buffer, long filesize, int download_or_verify)
 {
   
   unsigned char txbuf[6];
@@ -78,9 +79,7 @@ int flash_firmware(struct libusb_device_handle * iap_handle,
 
     memset(small_buf, 0, 64);
 
-    //first time write.
-    //note the 0*2
-    small_buf[0] = loop*2 | 0x80;
+    small_buf[0] = download_or_verify*2 | 0x80;
     small_buf[1] = copy_size;
     small_buf[2] = offset;
     small_buf[3] = offset >>8;
@@ -160,7 +159,7 @@ int switch_to_iap_mode(struct libusb_device_handle *wlink_handle,
   return 1;
 }
 
-int before_flash_firmware(struct libusb_device_handle *iap_handle) {
+int erase_app_flash(struct libusb_device_handle *iap_handle) {
   unsigned char txbuf[6];
   unsigned char rxbuf[20];
   unsigned int len = 5;
@@ -473,25 +472,22 @@ int main(int argc, char **argv)
     goto end;
   }
 
-  // STEP 5: before flash the firmware.
-  ret = before_flash_firmware(iap_handle);
+  // STEP 5: erase the app flash area.
+  ret = erase_app_flash(iap_handle);
   if(ret != 0) {
-    //I cann't figure out what is this command.
-    //Maybe it's something related to erase,
-    //Or tell IAP loader prepare to receive firmware.
-    //fprintf(stderr, "Fail to do something.\n");
+    fprintf(stderr, "Fail to erase.\n");
     goto end;
   }
   
-  // STEP 6: Write the firmware, first loop. 
-  ret = flash_firmware(iap_handle, buffer, filesize, 0);
+  // STEP 6: first loop, download the firmware.
+  ret = download_or_verify_firmware(iap_handle, buffer, filesize, 0);
   if(ret != 0) {
 		fprintf(stderr,"Fail to flash firmware.\n");
     goto end;
   }
 
-  // STEP 7: Write the firmware, second loop.
-  ret = flash_firmware(iap_handle, buffer, filesize, 1);
+  // STEP 7: second loop, verify the firmware
+  ret = download_or_verify_firmware(iap_handle, buffer, filesize, 1);
   if(ret != 0) {
 		fprintf(stderr,"Fail to flash firmware.\n");
     goto end;
