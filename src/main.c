@@ -54,14 +54,12 @@ int load_firmware(char *filename, char **buffer, long *filesize) {
   return 0; 
 }
 
+// value for last param 'cmd':
+// 0x80 to download
+// 0x82 to verify
 int flash_firmware(struct libusb_device_handle * iap_handle,
-    char *buffer, long filesize, u_int16_t cmd)
+    char *buffer, long filesize, u_int8_t cmd)
 {
-  if (cmd != 0x80 || cmd != 0x82) {
-    fprintf(stderr, "Wrong command: 0x80 to download, 0x82 to verify");
-    return 1;
-  }
-
   unsigned char txbuf[6];
   unsigned char rxbuf[20];
   unsigned int len = 0;
@@ -487,14 +485,14 @@ int main(int argc, char **argv)
   }
   
   // STEP 6: first loop, download the firmware.
-  ret = flash_firmware(iap_handle, buffer, filesize, 0x80);
+  ret = flash_firmware(iap_handle, buffer, filesize, DOWNLOAD);
   if(ret != 0) {
 		fprintf(stderr,"Fail to download firmware.\n");
     goto end;
   }
 
   // STEP 7: second loop, verify the firmware
-  ret = flash_firmware(iap_handle, buffer, filesize, 0x82);
+  ret = flash_firmware(iap_handle, buffer, filesize, VERIFY);
   if(ret != 0) {
 		fprintf(stderr,"Fail to verify firmware.\n");
     goto end;
