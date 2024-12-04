@@ -14,6 +14,11 @@
 #include "arg.h"
 char *argv0;
 
+
+#define DOWNLOAD 0x80
+#define VERIFY 0x82
+
+
 // ret 0 if file exists
 int file_not_exists(const char *filename)
 {
@@ -49,12 +54,14 @@ int load_firmware(char *filename, char **buffer, long *filesize) {
   return 0; 
 }
 
-// download: small_buf[0] == 0x80
-// verify: small_buf[0] == 0x82
-int download_or_verify_firmware(struct libusb_device_handle * iap_handle,
-    char *buffer, long filesize, int download_or_verify)
+int flash_firmware(struct libusb_device_handle * iap_handle,
+    char *buffer, long filesize, u_int16_t cmd)
 {
-  
+  if (cmd != 0x80 || cmd != 0x82) {
+    fprintf(stderr, "Wrong command: 0x80 to download, 0x82 to verify");
+    return 1;
+  }
+
   unsigned char txbuf[6];
   unsigned char rxbuf[20];
   unsigned int len = 0;
@@ -79,7 +86,7 @@ int download_or_verify_firmware(struct libusb_device_handle * iap_handle,
 
     memset(small_buf, 0, 64);
 
-    small_buf[0] = download_or_verify*2 | 0x80;
+    small_buf[0] = cmd;
     small_buf[1] = copy_size;
     small_buf[2] = offset;
     small_buf[3] = offset >>8;
@@ -480,16 +487,16 @@ int main(int argc, char **argv)
   }
   
   // STEP 6: first loop, download the firmware.
-  ret = download_or_verify_firmware(iap_handle, buffer, filesize, 0);
+  ret = flash_firmware(iap_handle, buffer, filesize, 0x80);
   if(ret != 0) {
-		fprintf(stderr,"Fail to flash firmware.\n");
+		fprintf(stderr,"Fail to download firmware.\n");
     goto end;
   }
 
   // STEP 7: second loop, verify the firmware
-  ret = download_or_verify_firmware(iap_handle, buffer, filesize, 1);
+  ret = flash_firmware(iap_handle, buffer, filesize, 0x82);
   if(ret != 0) {
-		fprintf(stderr,"Fail to flash firmware.\n");
+		fprintf(stderr,"Fail to verify firmware.\n");
     goto end;
   }
   
