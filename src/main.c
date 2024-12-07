@@ -297,9 +297,9 @@ int main(int argc, char **argv)
   
   char *firmware_file = NULL;
 
-  // flag to call switch to IAP only.
+  // flag to switch to IAP only.
   int into_iap = 0;
-  // flag to call quit IAP only.
+  // flag to quit IAP only.
   int quit_iap = 0;
 
   ARGBEGIN {
