@@ -15,13 +15,13 @@ All known WCH-Link models should be supported, but tested with:
 git clone https://github.com/cjacker/wlink-iap
 cd wlink-iap
 make
-make install
+sudo make install
 ```
 
 # Usage
 
 ```
-A tool to upgrade / downgrade WCH-Link/E firmware.
+A tool to flash WCH-Link/E firmware.
 By cjacker <cjacker@gmail.com>
 
 Usage:
@@ -30,19 +30,19 @@ wlink-iap -f <firmware file>
   Flash firmware.
   Firmwares can be extracted from WCH-LinkUtility.
   FIRMWARE_CH32V305.bin:  WCH-LinkE(ch32v305)
-  FIRMWARE_CH32V208.bin:  WCH-LinkB(ch32v208)
-  FIRMWARE_CH32V203.bin:  WCH-LinkS(ch32v203)
   FIRMWARE_CH549.bin:     WCH-Link(ch549) RV
   FIRMWARE_DAP_CH549.bin: WCH-Link(ch549) DAP
+  FIRMWARE_CH32V208.bin:  WCH-LinkB(ch32v208)
+  FIRMWARE_CH32V203.bin:  WCH-LinkS(ch32v203)
 
 wlink-iap -i
-  Enter IAP mode and exit.
+  Enter IAP mode.
 
 wlink-iap -q
   Quit IAP mode.
 ```
 
-## to flash (upgrade or downgrade) WCH-Link/E firmware using IAP method:
+## To flash (upgrade or downgrade) WCH-Link/E firmware using IAP method:
 
 Plug WCH-Link/E to PC USB port and run:
 
@@ -50,22 +50,22 @@ Plug WCH-Link/E to PC USB port and run:
 ./wlink-iap -f <firmware>
 ```
 
-## to enter IAP mode only
+## To enter IAP mode only
 
-If you want to erase code flash or/and re-program the whole firmware (firmwares with filename contains 'APP_IAP'), you have to enter IAP mode first by hold the 'IAP' button down when powerup, or by `wlink-iap -i`.
+If you want to erase code flash and/or re-program the whole firmware (firmwares with filename contains 'APP_IAP'), you have to enter IAP mode first by hold the 'IAP' button down when powerup, or by `wlink-iap -i`.
 
 This command is useful since official WCH-LinkE have a case and it's not convenient to hold the 'IAP' button down.
 
-After IAP mode entered, pleaser refer to [Update firmware of WCH-LinkE](https://github.com/cjacker/opensource-toolchain-ch32v?tab=readme-ov-file#update-firmware-of-wch-linke) to update the whole firmware.
+After IAP mode activated, pleaser refer to [Update firmware of WCH-LinkE](https://github.com/cjacker/opensource-toolchain-ch32v?tab=readme-ov-file#update-firmware-of-wch-linke) to update the whole firmware.
 
-## to quit IAP mode
+## To quit IAP mode
 
 If WCH-LinkE was switched to IAP mode accidently, for example, user want to switch RV/DAP mode by 'Mode' button but hold 'IAP' button down, You can quit IAP mode by `wlink-iap -q`.
 
 
 # Firmwares:
 
-I put the WCH-Link(CH549) and WCH-LinkE(CH32V) firmwares (v2.8 and v2.15) in this repo, for other unusual models, you can download and extract firmwares from WCH-LinkUtility.
+I put old and latest(up to this readme written) WCH-Link(CH549) and WCH-LinkE(CH32V) firmwares in this repo, for other unusual models, you can download and extract firmwares from WCH-LinkUtility.
 
 # Info:
 
